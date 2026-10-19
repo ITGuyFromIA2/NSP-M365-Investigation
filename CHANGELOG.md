@@ -3,7 +3,7 @@
 All notable changes to NSP.M365.Investigation are documented here. Versions follow
 [SemVer](https://semver.org/). `0.x` until it has real use outside NSP.
 
-## 0.1.0 (unreleased)
+## 0.1.0
 
 First release: the SkyKick IOC hunt script (`Invoke-SkyKickIocHunt.ps1`) as a module.
 
