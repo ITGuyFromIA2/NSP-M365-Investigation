@@ -1,0 +1,18 @@
+# Secrets - never commit
+*.sec
+/Secrets/
+secrets*.psd1
+*.local.ps1
+*ApiKey*
+*.pfx
+*.pem
+
+# Test / build output
+TestResults*.xml
+coverage*.xml
+/.pester/
+
+# Hunt output and tenant lists name clients - kept locally, never committed.
+*IOC_*/
+Findings.csv
+*.csv
