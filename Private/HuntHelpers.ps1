@@ -30,31 +30,38 @@ function Get-NSPHuntCollection {
         [int]$MaxPages = 200
     )
     $items = New-Object System.Collections.Generic.List[object]
+    $version = $ApiVersion
     $next = $Uri
     $page = 0
     while ($next -and $page -lt $MaxPages) {
-        $attempt = 0
-        while ($true) {
-            try {
-                $response = Invoke-NSPGraphRequest -Method GET -Uri $next -ApiVersion $ApiVersion
-                break
-            } catch {
-                $attempt++
-                if ($attempt -le 5 -and $_.Exception.Message -match '429|TooManyRequests|503|504|ServiceUnavailable|GatewayTimeout') {
-                    $wait = [math]::Min(60, [math]::Pow(2, $attempt) * 2)
-                    Write-Verbose "Throttled or transient error ($($_.Exception.Message)). Waiting $wait s."
-                    Start-Sleep -Seconds $wait
-                    continue
-                }
-                throw
-            }
-        }
+        $uri = $next
+        $response = Invoke-NSPGraphRetry { Invoke-NSPGraphRequest -Method GET -Uri $uri -ApiVersion $version }
         foreach ($item in @($response['value'])) { if ($null -ne $item) { $items.Add($item) } }
         $next = $response['@odata.nextLink']
         $page++
     }
     if ($next) { Write-Warning "Stopped after $MaxPages page(s) of $Uri; later results were not read." }
     , $items.ToArray()
+}
+
+function Invoke-NSPGraphRetry {
+    # Runs one Graph call, retrying throttling and transient errors with backoff.
+    param([Parameter(Mandatory)][scriptblock]$Call)
+    $attempt = 0
+    while ($true) {
+        try {
+            return (& $Call)
+        } catch {
+            $attempt++
+            if ($attempt -le 5 -and $_.Exception.Message -match '429|TooManyRequests|503|504|ServiceUnavailable|GatewayTimeout') {
+                $wait = [math]::Min(60, [math]::Pow(2, $attempt) * 2)
+                Write-Verbose "Throttled or transient error ($($_.Exception.Message)). Waiting $wait s."
+                Start-Sleep -Seconds $wait
+                continue
+            }
+            throw
+        }
+    }
 }
 
 function New-NSPHuntFilterUri {

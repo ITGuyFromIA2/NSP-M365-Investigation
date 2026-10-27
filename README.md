@@ -56,7 +56,43 @@ Pass `-AdditionalIocIPs` / `-AdditionalIocAppIds` for a one-off run. To keep the
 the set's `.psd1` and release. For a new incident, copy `IocSets\SkyKick.psd1` and pass its path
 as `-IocSet` until it ships.
 
+## Mailbox compromise triage
+
+For a single compromised mailbox (BEC), from exports rather than a live hunt:
+
+```powershell
+# Purview > Audit: search the user, all operations, a window well before the compromise; export.
+Invoke-NSPM365AuditTriage -Path .\audit.csv -TrustedIP 198.51.100.10 -TrustedAsn 7018 -ExpectedCountry US -InternalDomain contoso.com
+
+Get-NSPM365AuditSummary -Path .\audit.csv -GroupBy ClientIP | Resolve-NSPIpInfo   # who touched it, from where
+Get-NSPM365AccessedMessage -Path .\audit.csv | Where-Object ClientIP -eq 203.0.113.50   # what they read
+Get-NSPM365InboxRuleAudit -Path .\audit.csv | Where-Object Suspicious              # rules they made
+
+Connect-ExchangeOnline; Get-NSPM365InboxRuleReport -SuspiciousOnly                 # rules there now, every mailbox
+Get-NSPM365InboxRuleReport -Mailbox jdoe@contoso.com -SuspiciousOnly | Remove-NSPM365InboxRule -WhatIf
+
+Get-NSPM365AccessedMessage -Path .\audit.csv | Where-Object ClientIP -eq 203.0.113.50 |
+    Export-NSPM365Message -TenantId contoso.com -ClientId <id> -CertificateThumbprint <thumb>   # .eml + hashes
+
+ConvertFrom-NSPM365MessageTrace .\MTSummary_*_Sender.csv | Group-Object RecipientDomain   # who a phishing blast reached
+```
+
+`Invoke-NSPM365AuditTriage` writes Findings.csv (the hunt's columns, severity-sorted) plus
+Timeline, IPs, Summary, SignIns, AccessedMail and InboxRules CSVs. Untrusted activity is grouped
+per user and address, so one attacker session is one finding.
+
+- **Trust is yours to set.** Without `-TrustedIP` / `-TrustedAsn` every address is untrusted.
+  Microsoft's ASN (8075) is never trusted on its own: attackers use Azure too.
+- **IP lookups go to ip-api.com** over plain HTTP, and its free tier is non-commercial. Use
+  `-SkipIpLookup` to keep addresses local (the hosting and country findings are then skipped).
+- **Only `Remove-NSPM365InboxRule` changes anything**, confirming each rule. It returns every rule's
+  settings from before the change; `-Disable` stops a rule but keeps it for the report.
+- `Export-NSPM365Message` saves the messages AccessedMail lists as .eml with SHA-256 hashes
+  (app-only Mail.Read, or delegated Mail.Read.Shared with Full Access to the mailbox).
+- A **Sync** in AccessedMail means whole folders were downloaded: treat every message in that
+  folder as read. InternetMessageId is what to search for to pull the messages.
+
 ## Requirements
 
-Windows PowerShell 5.1 or PowerShell 7. NSP.M365.Graph (installed on first use) and
-Microsoft.Graph.Authentication.
+Windows PowerShell 5.1 or PowerShell 7. NSP.M365.Graph and NSP.LogParse (installed on first use)
+and Microsoft.Graph.Authentication. `Get-NSPM365InboxRuleReport` needs ExchangeOnlineManagement.
