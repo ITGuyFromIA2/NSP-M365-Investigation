@@ -3,7 +3,7 @@
 All notable changes to NSP.M365.Investigation are documented here. Versions follow
 [SemVer](https://semver.org/). `0.x` until it has real use outside NSP.
 
-## 0.1.1 (unreleased)
+## 0.1.1 (2026-10-28)
 
 Mailbox-compromise triage from Unified Audit Log and message trace exports: the patterns the
 per-client NSP-Investigation scripts repeated, as functions. NSP.LogParse (audit CSV parsing) is
